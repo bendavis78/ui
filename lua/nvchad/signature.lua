@@ -6,51 +6,58 @@ local M = {}
 
 M.signature_window = function(_, result, ctx, config)
   local bufnr, winner = vim.lsp.handlers.signature_help(_, result, ctx, config)
-  local cursor_pos = vim.api.nvim_win_get_cursor(0)
-  local current_cursor_line, _ = cursor_pos[1], cursor_pos[2]
-  local total_lines = vim.api.nvim_buf_line_count(0)
-
-  -- Calculate the height and width based on content
-  local max_height = config.max_height or 10
-  local max_width = config.max_width or 80
-  local line_count = vim.api.nvim_buf_line_count(bufnr)
-  local height = math.min(line_count, max_height)
-  local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-  local width = 0
-  for _, line in ipairs(lines) do
-    width = math.min(math.max(width, #line), max_width)
-  end
-
-  -- Calculate available space above and below cursor
-  local lines_above = current_cursor_line - 1
-  local lines_below = total_lines - current_cursor_line
-
-  -- Determine optimal placement and height for the floating window
-  local anchor = "NW"
-  local row = 1
-  if lines_below >= height then
-    -- Place below cursor if enough space
-    anchor = "NW"
-    row = 1
-  elseif lines_above >= height then
-    -- Place above cursor if enough space
-    anchor = "SW"
-    row = 0
-  else
-    -- Reduce height to fit available space above cursor
-    anchor = "SW"
-    row = 0
-    height = lines_above
-  end
-
   if winner then
+    local cursor_pos = vim.api.nvim_win_get_cursor(0)
+    local current_cursor_line, _ = cursor_pos[1], cursor_pos[2]
+    local main_buf_height = vim.api.nvim_win_get_height(0)
+    --local main_buf_width = vim.api.nvim_win_get_width(0)
+
+    -- Calculate the height and width based on content
+    local max_height = config.max_height or 10
+    local max_width = config.max_width or 80
+    local line_count = vim.api.nvim_buf_line_count(bufnr)
+    local sig_win_height = math.min(line_count, max_height)
+    local sig_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    local sig_win_width = 0
+    for _, line in ipairs(sig_lines) do
+      sig_win_width = math.min(math.max(sig_win_width, #line), max_width)
+    end
+
+    -- Calculate available space above and below cursor
+    local lines_above = current_cursor_line - 1
+    local lines_below = main_buf_height - current_cursor_line
+
+    -- Determine optimal placement and height for the floating window
+    -- Determine optimal placement and height for the floating window
+    local anchor
+    local row
+    if lines_below >= sig_win_height then
+      -- Place below cursor if enough space
+      anchor = "NW"
+      row = 1
+    elseif lines_above >= sig_win_height then
+      -- Place above cursor if enough space
+      anchor = "SW"
+      row = 0
+    elseif lines_below > lines_above then
+      -- Reduce sig_win_height to fit available space below cursor
+      anchor = "NW"
+      row = 1
+      sig_win_height = lines_below
+    else
+      -- Reduce sig_win_height to fit available space above cursor
+      anchor = "SW"
+      row = 1
+      sig_win_height = lines_above
+    end
+
     vim.api.nvim_win_set_config(winner, {
       anchor = anchor,
       relative = "cursor",
       row = row,
       col = 0,
-      width = width,
-      height = height,
+      width = sig_win_width,
+      height = sig_win_height,
     })
   end
 
