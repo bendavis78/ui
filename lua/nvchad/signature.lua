@@ -3,25 +3,62 @@ local config = require("core.utils").load_config().ui.lsp.signature
 -- thx to https://gitlab.com/ranjithshegde/dotbare/-/blob/master/.config/nvim/lua/lsp/init.lua
 local M = {}
 
+
 M.signature_window = function(_, result, ctx, config)
   local bufnr, winner = vim.lsp.handlers.signature_help(_, result, ctx, config)
-  local current_cursor_line = vim.api.nvim_win_get_cursor(0)[1]
+  local cursor_pos = vim.api.nvim_win_get_cursor(0)
+  local current_cursor_line, _ = cursor_pos[1], cursor_pos[2]
+  local total_lines = vim.api.nvim_buf_line_count(0)
+
+  -- Calculate the height and width based on content
+  local max_height = config.max_height or 10
+  local max_width = config.max_width or 80
+  local line_count = vim.api.nvim_buf_line_count(bufnr)
+  local height = math.min(line_count, max_height)
+  local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+  local width = 0
+  for _, line in ipairs(lines) do
+    width = math.min(math.max(width, #line), max_width)
+  end
+
+  -- Calculate available space above and below cursor
+  local lines_above = current_cursor_line - 1
+  local lines_below = total_lines - current_cursor_line
+
+  -- Determine optimal placement and height for the floating window
+  local anchor = "NW"
+  local row = 1
+  if lines_below >= height then
+    -- Place below cursor if enough space
+    anchor = "NW"
+    row = 1
+  elseif lines_above >= height then
+    -- Place above cursor if enough space
+    anchor = "SW"
+    row = 0
+  else
+    -- Reduce height to fit available space above cursor
+    anchor = "SW"
+    row = 0
+    height = lines_above
+  end
 
   if winner then
-    if current_cursor_line > 3 then
-      vim.api.nvim_win_set_config(winner, {
-        anchor = "SW",
-        relative = "cursor",
-        row = 0,
-        col = -1,
-      })
-    end
+    vim.api.nvim_win_set_config(winner, {
+      anchor = anchor,
+      relative = "cursor",
+      row = row,
+      col = 0,
+      width = width,
+      height = height,
+    })
   end
 
   if bufnr and winner then
     return bufnr, winner
   end
 end
+
 
 -- thx to https://github.com/seblj/dotfiles/blob/0542cae6cd9a2a8cbddbb733f4f65155e6d20edf/nvim/lua/config/lspconfig/init.lua
 local augroup = vim.api.nvim_create_augroup
